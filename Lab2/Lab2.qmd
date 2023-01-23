@@ -31,27 +31,50 @@ delay_2022 <- get_resource(delay_2022_ids)
 
 # make the column names nicer to work with
 delay_2022 <- clean_names(delay_2022)
-delay_2022 <- delay_2022 |> filter(line %in% c("BD", "YU", "SHP", "SRT"))
+
 head(delay_2022)
 ```
+```{r}
+delay_codes <- get_resource("3900e649-f31e-4b79-9f20-4731bbfd94f7")
+delay_data_codebook <- get_resource("ca43ac3d-3940-4315-889b-a9375e7b8aa4")
+delay_2022 <- delay_2022 |> filter(line %in% c("BD", "YU", "SHP", "SRT"))
+ggplot(data = delay_2022) + 
+  geom_histogram(aes(x = min_delay))
+delay_2022 <- delay_2022 |> 
+  left_join(delay_codes |> 
+              rename(code = `SUB RMENU CODE`, 
+                     code_desc = `CODE DESCRIPTION...3`) |>
+              select(code, code_desc)) 
+
+
+delay_2022 <- delay_2022 |>
+  mutate(code_srt = ifelse(line=="SRT", code, "NA")) |> 
+  left_join(delay_codes |> 
+              rename(code_srt = `SRT RMENU CODE`, 
+                     code_desc_srt = `CODE DESCRIPTION...7`) |> 
+              select(code_srt, code_desc_srt))  |> 
+  mutate(code = ifelse(code_srt=="NA", code, code_srt),
+         code_desc = ifelse(is.na(code_desc_srt), code_desc, code_desc_srt)) |> 
+  select(-code_srt, -code_desc_srt)
+```
 
 ```{r}
-q1 <- delay_2022 %>% group_by(station, line) %>% 
-  summarise(across(min_delay,mean),  .groups = "keep")
-```
+# find top 5 stations
+delay_2022 %>% group_by(code) %>% 
+  summarise(mean_delay = mean(min_delay)) %>% arrange(desc(mean_delay)) %>% head(5)
 
+```
 ```{r}
-q1 %>% group_by(line) %>% top_n(n = 5, wt = min_delay)
+delay_2022 %>% filter(code == "MUEC" |
+                        code == "MUFM" | 
+                        code == "MRPLB" |
+                        code == "PUTTP" | 
+                        code == "MUPR1" ) %>% 
+  ggplot() +
+  geom_density(aes(x = min_delay, color = code, bw=0.8))+
+  facet_wrap(~line)
 ```
 
-
-```{r fig.height= 12}
-q1 %>% group_by(line) %>% top_n(n = 5, wt = min_delay) %>% 
-  ggplot(aes(x=station, min_delay)) + 
-  geom_point() + 
-  facet_wrap(~line, ncol = 1) + 
-  theme(axis.text.x = element_text(angle = 90))
-```
 
 
 
