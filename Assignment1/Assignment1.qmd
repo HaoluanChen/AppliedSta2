@@ -283,3 +283,9 @@ The prediction is about 10% off. I guess it is pretty good considering the varia
 ## d)
 
 ## e)
+
+For first option, I think it has the second highest granularity of information, since it is combining the count of 18+ fully vaccinated in county level into state level. The Second option has least granularity of information since it is averaging the county results. And the last option is not only using the information in county level(mode detailed level), but also includes county as a covariate. 
+
+In my opinion, the the third option is not appropriate in most of the case because it contains way too many covariates, we will not be able to extract useful information from it. 
+
+First and second option depends on weather or not you are interested in the total count or average of the county level. Note that the average will suffer from problem of outlier 
