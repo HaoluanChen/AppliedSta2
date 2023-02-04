@@ -1,0 +1,75 @@
+---
+title: "A1 temp"
+author: "Haoluan Chen"
+date: "1/31/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(tidyverse)
+library(readr)
+library(skimr) # EDA
+```
+
+```{r}
+q2 <- read_excel("Assignment1/data/q2.xlsx")
+```
+
+a)
+
+```{r}
+q2 %>% ggplot(aes(x=MasFem, y=alldeaths)) + geom_point()
+q2 %>% ggplot(aes(x=MinPressure_before, y=alldeaths)) + geom_point()
+q2 %>% ggplot(aes(x=NDAM, y=alldeaths)) + geom_point()
+```
+```{r}
+model1 <- glm(alldeaths~MasFem, family = poisson, data = q2)
+summary(model1)
+```
+```{r}
+res <- model1$residuals
+res
+plot(fitted(model1), res)
+```
+
+```{r}
+standard_res <- rstandard(model1)
+plot(fitted(model1), standard_res)
+```
+
+```{r}
+n = 92
+k = 1
+sum(standard_res^2)/(n-k)
+
+```
+```{r}
+1-pchisq(sum(standard_res^2), n-k)
+```
+
+```{r}
+model2 <- glm(alldeaths~MasFem, family = quasipoisson, data = q2)
+summary(model2)
+```
+
+```{r}
+summary(model2)[["dispersion"]]
+```
+
+## Q3
+```{r}
+q3 <- read_csv("Assignment1/data/q3.csv")
+View(q3)
+```
+
+```{r}
+acs <- acs %>% pivot_wider(names_from = variable, values_from=value)
+acs <- acs %>% rename(FIPS = fips)
+```
+
+```{r}
+combined <- left_join(q3, acs, by='FIPS')
+```
+
