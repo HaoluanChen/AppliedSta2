@@ -26,6 +26,7 @@ The data look like this:
 kidiq <- read_rds(here("data","kidiq.RDS"))
 kidiq
 ```
+
 As well as the kid's test scores, we have a binary variable indicating whether or not the mother completed high school, the mother's IQ and age. 
 
 
@@ -37,6 +38,25 @@ Use plots or tables to show three interesting observations about the data. Remem
 
 - Explain what your graph/ tables show
 - Choose a graph type that's appropriate to the data type
+
+```{r}
+kidiq %>%
+ggplot(aes(x = mom_iq, y = kid_score, col = as.factor(mom_hs))) +
+geom_point() 
+```
+
+```{r}
+kidiq %>%
+ggplot(aes(x = as.factor(mom_hs), y = kid_score)) +
+geom_boxplot()
+```
+
+```{r}
+kidiq %>%
+ggplot(aes(x = mom_age, y = kid_score)) +
+geom_point() 
+```
+
 
 # Estimating mean, no covariates
 
@@ -60,7 +80,7 @@ data <- list(y = y,
 Now we can run the model:
 
 ```{r}
-fit <- stan(file = here("code/models/kids2.stan"),
+fit <- stan(file = here("Labs/Lab5/kids2.stan"),
             data = data,
             chains = 3,
             iter = 500)
@@ -151,7 +171,45 @@ dsamples |>
 
 ## Question 2
 
-Change the prior to be much more informative (by changing the standard deviation to be 0.1). Rerun the model. Do the estimates change? Plot the prior and posterior densities. 
+Change the prior to be much more informative (by changing the standard deviation to be 0.1). Rerun the model. Do the estimates change? Plot the prior and posterior densities.
+```{r}
+y <- kidiq$kid_score
+mu0 <- 80
+sigma0 <- 0.1
+
+# named list to input for stan function
+data <- list(y = y, 
+             N = length(y), 
+             mu0 = mu0,
+             sigma0 = sigma0)
+```
+
+
+
+Now we can run the model:
+
+```{r}
+fit <- stan(file = here("Labs/Lab5/kids2.stan"),
+            data = data,
+            chains = 3,
+            iter = 500)
+```
+```{r}
+dsamples <- fit  |> 
+  gather_draws(mu, sigma) # gather = long format
+dsamples |> 
+  filter(.variable == "mu") |> 
+  ggplot(aes(.value, color = "posterior")) + geom_density(size = 1) + 
+  xlim(c(70, 100)) + 
+  stat_function(fun = dnorm, 
+        args = list(mean = mu0, 
+                    sd = sigma0), 
+        aes(colour = 'prior'), size = 1) +
+  scale_color_manual(name = "", values = c("prior" = "red", "posterior" = "black")) + 
+  ggtitle("Prior and posterior for mean test scores") + 
+  xlab("score")
+  
+```
 
 # Adding covariates
 
@@ -174,16 +232,32 @@ K <- 1
 
 data <- list(y = y, N = length(y), 
              X =X, K = K)
-fit2 <- stan(file = here("code/models/kids3.stan"),
+fit2 <- stan(file = here("Labs/Lab5/kids3.stan"),
             data = data, 
             iter = 1000)
 ```
+
+
 
 ## Question 3
 
 a) Confirm that the estimates of the intercept and slope are comparable to results from `lm()` 
 b) Do a `pairs` plot to investigate the joint sample distributions of the slope and intercept. Comment briefly on what you see. Is this potentially a problem?
 
+```{r}
+fit2
+```
+
+
+```{r}
+model3 = lm(kid_score ~ mom_hs, data = kidiq)
+summary(model3)
+```
+```{r}
+pairs(fit2, pars = c("alpha", "beta[1]"))
+```
+
+Yes, there is a correlction problem
 
 ## Plotting results
 
@@ -209,16 +283,65 @@ fit2 |>
 Add in mother's IQ as a covariate and rerun the model. Please  mean center the covariate before putting it into the model. Interpret the coefficient on the (centered) mum's IQ. 
 
 
+```{r}
+kidiqdata <- kidiq %>% mutate(ceneterdiq = scale(mom_iq, scale = FALSE))
+X <- as.matrix(cbind(kidiqdata$mom_hs, kidiqdata$ceneterdiq), nrow = 434, ncol = 2) # force this to be a matrix
+K <- 2
+
+data <- list(y = y, N = length(y), 
+             X =X, K = K)
+fit3 <- stan(file = here("Labs/Lab5/kids3.stan"),
+            data = data, 
+            iter = 1000)
+```
+
+```{r}
+fit3
+```
+
 ## Question 5 
 
 Confirm the results from Stan agree with `lm()`
 
+```{r}
+model5 = lm(kid_score ~ mom_hs+ceneterdiq, data = kidiqdata)
+summary(model5)
+```
+
+
 ## Question 6
 
 Plot the posterior estimates of scores by education of mother for mothers who have an IQ of 110. 
+```{r}
+fit3 |>
+  spread_draws(alpha, beta[k], sigma) |> 
+  pivot_wider(names_from = k, names_prefix = "beta", values_from = beta) |> 
+     mutate(nhs = alpha + beta2*10, # no high school is just the intercept
+          hs = alpha + beta1 + beta2*10) |> 
+  select(nhs, hs) |> 
+  pivot_longer(nhs:hs, names_to = "education", values_to = "estimated_score") |> 
+  ggplot(aes(y = education, x = estimated_score)) +
+  stat_halfeye() + 
+  theme_bw() + 
+  ggtitle("Posterior estimates of scores by education level of mother with IQ 110")
+  
+```
+
+
+
 
 ## Question 7
 
 Generate and plot (as a histogram) samples from the posterior predictive distribution for a new kid with a mother who graduated high school and has an IQ of 95. 
+```{r}
+x_new = 95
+post_samples <- extract(fit3)
+alpha_hat <- post_samepls[["alpha"]]
+beta1_hat <- post_samepls[["beta"]][,1]
+beta2_hat <- post_samepls[["beta"]][,2]
+lin_pre <- alpha_hat + beta1_hat + -5*beta2_hat
+hist(lin_pre)
+```
+
 
 
