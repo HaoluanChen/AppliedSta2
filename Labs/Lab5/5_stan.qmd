@@ -44,19 +44,21 @@ kidiq %>%
 ggplot(aes(x = mom_iq, y = kid_score, col = as.factor(mom_hs))) +
 geom_point() 
 ```
+The plot shows that there is much more observations with mom attended high school. It looks like there is increasing trend for kid's score as mom's iq increase no matter the mom attended high school or not. 
 
 ```{r}
 kidiq %>%
 ggplot(aes(x = as.factor(mom_hs), y = kid_score)) +
 geom_boxplot()
 ```
+The box plot shows that there is wider variability in kid's score when mother did not attend high school. And when the mom didn't attend high school, the median, 25% and 75% quantile of kid's score are lower. 
 
 ```{r}
 kidiq %>%
 ggplot(aes(x = mom_age, y = kid_score)) +
 geom_point() 
 ```
-
+Based on the scatter plot, I don't think mom's age affect kid's score. 
 
 # Estimating mean, no covariates
 
@@ -172,6 +174,7 @@ dsamples |>
 ## Question 2
 
 Change the prior to be much more informative (by changing the standard deviation to be 0.1). Rerun the model. Do the estimates change? Plot the prior and posterior densities.
+
 ```{r}
 y <- kidiq$kid_score
 mu0 <- 80
@@ -210,6 +213,12 @@ dsamples |>
   xlab("score")
   
 ```
+```{r}
+fit
+```
+
+The estimates does change. The mean of the posterior of mu became 80.06, very close to our strong prior that the mean should be around 80. The sd of posterior of mu became 0.1, much smaller than before(0.93). This also reflected on the posterior density plot that we have much narrower density. Also, the sigma increased slightly from 20.40 to 21.41.
+
 
 # Adding covariates
 
@@ -253,11 +262,14 @@ fit2
 model3 = lm(kid_score ~ mom_hs, data = kidiq)
 summary(model3)
 ```
+
+The output from lm agrees with our model output. In lm, we have intercept of 77.548 and estimate for mom_hs is 11.771, where from our stan model, we have intercept of 77.96 and estimate for mom_hs is 11.21. 
+
 ```{r}
 pairs(fit2, pars = c("alpha", "beta[1]"))
 ```
 
-Yes, there is a correlction problem
+Yes, there is a correlction problem that as alpha(intercept) increase we get a lower beta(slope). 
 
 ## Plotting results
 
@@ -298,6 +310,9 @@ fit3 <- stan(file = here("Labs/Lab5/kids3.stan"),
 ```{r}
 fit3
 ```
+The coefficient estimate is 0.57, this means that every mom's IQ point higher than average the
+estimated kid score is increased by 0.57.
+
 
 ## Question 5 
 
@@ -306,8 +321,8 @@ Confirm the results from Stan agree with `lm()`
 ```{r}
 model5 = lm(kid_score ~ mom_hs+ceneterdiq, data = kidiqdata)
 summary(model5)
-```
-
+``` 
+The result from lm agree with the stan result: in lm we have 82.12, 5.95 and 0.56 for the intercept, beta1, beta2. In Stan, we got 82.31, 5.72 and 0.57
 
 ## Question 6
 
@@ -336,11 +351,13 @@ Generate and plot (as a histogram) samples from the posterior predictive distrib
 ```{r}
 x_new = 95
 post_samples <- extract(fit3)
-alpha_hat <- post_samepls[["alpha"]]
-beta1_hat <- post_samepls[["beta"]][,1]
-beta2_hat <- post_samepls[["beta"]][,2]
+alpha_hat <- post_samples[["alpha"]]
+beta1_hat <- post_samples[["beta"]][,1]
+beta2_hat <- post_samples[["beta"]][,2]
+sigma_hat <- post_samples[["sigma"]]
 lin_pre <- alpha_hat + beta1_hat + -5*beta2_hat
-hist(lin_pre)
+y_new <- rnorm(n = length(sigma_hat), mean = lin_pre, sd = sigma_hat)
+hist(y_new)
 ```
 
 
