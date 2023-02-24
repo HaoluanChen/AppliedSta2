@@ -69,7 +69,7 @@ ds %>% ggplot() + aes(x = gest, y = birthweight, color = preterm, group = preter
   geom_smooth(method = "lm") +
   labs(title = "Weight vs Gestational Age")
 ```
-
+I replicated the scatter plots in the lecture. The plot shows the gestational age in weeks and baby's birth weight. We see that, there is a increasing trend as gestational age in weeks increase. However, the slope is different whether or not the baby is preterm. 
 
 ```{r}
 ds %>% ggplot() + aes(x = mager, y = birthweight, color = preterm) +
@@ -77,13 +77,15 @@ ds %>% ggplot() + aes(x = mager, y = birthweight, color = preterm) +
   theme_bw() +
   labs(title = "Weight vs Gestational Age")
 ```
+This plot shows the mother's age on the x-axis and baby's birth weight on the y axis. Based on the plot, it not obvious whether or no the mother's age will affect the birth weight, but it is more clear that we have unbalanced preterm data.
+
 ```{r}
 ds %>% ggplot() + aes(x = bmi, y = birthweight, color = preterm) +
   geom_point(alpha = 0.4) +
   theme_bw() +
   labs(title = "bmi vs Gestational Age")
 ```
-
+There is some problem with the BMI coding, there are many observation with BMI of 100. 
 
 # The model
 
@@ -419,3 +421,4 @@ ppc_loo_pit_overlay(yrep = yrep2, y = y, lw = weights(loo2$psis_object))
 ppc_loo_pit_overlay(yrep = yrep3, y = y, lw = weights(loo3$psis_object))
 ```
 
+Overall, from the distribution of observed versus predicted birthweights, test statistics(median) and LOO-PIT plot, we see that the two model is very similar. This is because the effect/coefficient(beta[5]) for mother's age is very small. This also reflected on loo_compare, that the elpd difference is only -15.1, indicating model 3 is silightly better then model 2 with mother's age added as covariate.
