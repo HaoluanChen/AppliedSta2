@@ -251,7 +251,8 @@ yrep1 <- extract(mod1)[["log_weight_rep"]]
 yrep2 <- extract(mod2)[["log_weight_rep"]] 
 dim(yrep1)
 samp100 <- sample(nrow(yrep1), 100)
-ppc_dens_overlay(y, yrep1[samp100, ])  + ggtitle("distribution of observed versus predicted birthweights")
+ppc_dens_overlay(y, yrep1[samp100, ])  + 
+  ggtitle("distribution of observed versus predicted birthweights")
 ```
 
 ## Question 6
@@ -271,8 +272,10 @@ samples %>%
   pivot_longer( everything(), names_to = "simulate", values_to = "Log_Weight" ) %>% 
   ggplot(aes(Log_Weight, group = simulate)) +
   geom_density(alpha = 0.2, aes(color = "samples")) +
-  geom_density(data = ds %>% mutate(simulate = "value"), aes(x = log(birthweight), col = "value")) +
-  scale_color_manual(name = "", values = c("value" = "darkblue", "samples" = "lightblue")) +
+  geom_density(data = ds %>% 
+                 mutate(simulate = "value"), aes(x = log(birthweight), col = "value")) +
+  scale_color_manual(name = "", 
+                     values = c("value" = "darkblue", "samples" = "lightblue")) +
   ggtitle("Distribution of observed vs predicted birthweights")
 ```
 
