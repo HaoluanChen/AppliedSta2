@@ -1,0 +1,160 @@
+---
+title: "Assignment2"
+format: html
+editor: visual
+---
+
+```{r}
+library(readr)
+library(tidyverse)
+```
+
+# 1
+
+## a) 
+
+From lecture 4:
+Assuming $\sigma$ is known, both likelihood and prior is normal, we have conjugate prior that our posterior also follows normal distribution:
+
+$$p(\mu|y) \sim N(\mu_{posterior}, \sigma_{posterior}^2)$$
+Where
+
+$$\mu_{posterior} = N(\frac{\mu_0/\sigma_0^2+n*\bar{y}/\sigma^2}{1/\sigma_{\mu0}^2+n/\sigma^2}, \frac{1}{1/\sigma_{\mu0}^2+n/\sigma^2})$$
+```{r}
+mu0 = 100
+sigma0 = 15
+sigma = 15
+mu = 113
+n = 10
+
+mu_posterior = (mu0/sigma0^2 + n*mu/sigma^2)/(1/sigma0^2+n/sigma^2)
+mu_posterior
+sigma_posterior = 1/(1/sigma0^2+n/sigma^2)
+sigma_posterior
+```
+posterior mean is 111.82 and posterior variance is 20.45
+
+```{r}
+ci_lower <- qnorm(p = 0.025, mean = mu_posterior, sd = sqrt(sigma_posterior))
+ci_upper <- qnorm(p = 0.975, mean = mu_posterior, sd = sqrt(sigma_posterior))
+ci_lower
+ci_upper
+```
+The 95% credible interval is [102.95, 120.68]
+
+## b)
+$$E[(\hat\mu-\mu^*)^2|\mu^*]= E[(\hat\mu-E(\hat\mu)+E(\hat\mu) -\mu^*)^2|\mu^*]$$
+
+$$  = E[(\hat\mu-E(\hat\mu))^2 + 2(\hat\mu-E(\hat\mu))(E(\hat\mu)-\mu^*) + (E(\hat\mu) - \mu^*)^2|\mu^*]$$
+$$ = E[(\hat\mu-E(\hat\mu))^2|\mu^*] + E[(E(\hat\mu)- \mu^*)|\mu^*]$$
+
+## c) 
+Assuming $\mu^* =112$ 
+
+For Bayesian: 
+bias = 111.82 - 112 = 0.18 
+variance = 20.45
+MSE = 20.45 + 0.18
+
+For MLE:x`
+Bias = 113 - 112 = 1
+Variance = $\sigma^2/n = 22.5$
+MSE = 1 + 22.5 = 23.5
+
+MLE estimates has larger bias, variance, and MSE
+
+## d)
+```{r}
+mle_mu <- 113 
+mle_var <- 22.5
+x <- seq(from = 90, to = 130, by = 0.1)
+mle_data <- dnorm(x,mle_mu, sqrt(mle_var) )
+bayes_data <- dnorm(x,mu_posterior, sqrt(sigma_posterior) )
+data <- data.frame(x, mle_data, bayes_data)
+data %>%
+  pivot_longer(cols = c("mle_data","bayes_data"), names_to = "type", values_to = "density") %>%
+ggplot(aes(x = x, y = density, fill = type)) +
+geom_area(alpha = 0.8) +
+labs(title = "Sampling densities by type")+
+  geom_vline(xintercept = 112, color = "black")
+```
+
+```{r}
+n = 50 
+mle_mu <- 113 
+mle_var <- 15^2/n
+mu_posterior = (mu0/sigma0^2 + n*mu/sigma^2)/(1/sigma0^2+n/sigma^2)
+sigma_posterior = 1/(1/sigma0^2+n/sigma^2)
+
+```
+
+```{r}
+n = 100 
+mle_mu <- 113 
+mle_var <- 15^2/n
+mu_posterior = (mu0/sigma0^2 + n*mu/sigma^2)/(1/sigma0^2+n/sigma^2)
+sigma_posterior = 1/(1/sigma0^2+n/sigma^2)
+```
+
+```{r}
+n <- seq(from = 10, to = 100, by = 1)
+mle_mu <- 113 
+mle_var <- 15^2/n
+mu_posterior = (mu0/sigma0^2 + n*mu/sigma^2)/(1/sigma0^2+n/sigma^2)
+sigma_posterior = 1/(1/sigma0^2+n/sigma^2)
+d <- data.frame(n, mle_mu, mle_var,mu_posterior, sigma_posterior)
+d %>% mutate(mle_bias = mle_mu - 112, bayes_bias = mu_posterior - 112, 
+             mle_MSE = mle_bias+mle_var, bayes_MSE = bayes_bias+ sigma_posterior) %>% 
+  ggplot(aes(x = n, y = bayes_MSE/mle_MSE)) + geom_point()
+  
+```
+
+# 2
+```{r}
+sweden <- read_csv("data/sweden.csv")
+```
+```{r}
+sweden <- sweden %>% mutate(mortality = deaths/pop)
+```
+
+```{r}
+sweden %>% filter(age>= 50 & age < 60) %>% 
+  ggplot(aes(x = year, y = mortality, col = factor(age))) +   
+           geom_point()
+
+sweden %>% filter(age>= 60 & age < 70) %>% 
+  ggplot(aes(x = year, y = mortality, col = factor(age))) +   
+           geom_point()
+
+sweden %>% filter(age>= 70 & age < 80) %>% 
+  ggplot(aes(x = year, y = mortality, col = factor(age))) +   
+           geom_point()
+
+sweden %>% filter(age>= 80 & age < 90) %>% 
+  ggplot(aes(x = year, y = mortality, col = factor(age))) +   
+           geom_point()
+sweden %>% filter(age >= 90) %>% 
+  ggplot(aes(x = year, y = mortality, col = factor(age))) +   
+           geom_point()
+```
+```{r}
+sweden %>% filter(age == 100 & year == 2020)
+sweden %>% filter(age == 50 & year == 2020)
+```
+
+
+```{r}
+x = 50
+exp(x/30)
+x = 100
+exp(x/16)/1000
+```
+
+
+# 3
+
+```{r}
+q3data <- read_table("http://www.stat.columbia.edu/~gelman/arm/examples/arsenic/wells.dat")
+q3data
+```
+
