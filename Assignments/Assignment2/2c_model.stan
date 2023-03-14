@@ -11,24 +11,37 @@ parameters {
   real<lower=0> alpha;
 }
 
-transformed parameters {
-  vector[N] mu;
-  for (i in 1:N){
-    mu[i] = alpha * exp(beta * age[i]);
-  }
+//transformed parameters {
+//  vector[N] mu;
+//  for (i in 1:N){
+//    mu[i] = alpha * exp(beta * age[i]);
+//  }
   
-}
+//}
 model {
   // Log-likelihood
-  for (i in 1:N){
-      target += poisson_lpmf(death[i] | mu[i]*pop[i]);
-  }
+  death ~ poisson_log(log(alpha) + beta*age + log(pop));
 
 
   //priors
   target += normal_lpdf(alpha | 700, 500)
           + normal_lpdf(beta | 0.036, 0.05);
+          //+ normal_lpdf(beta | 0.5, 0.2);
 }
+
+
+//model {
+  // Log-likelihood
+//  for (i in 1:N){
+//      target += poisson_lpmf(death[i] | mu[i]*pop[i]);
+//  }
+
+
+  //priors
+//  target += normal_lpdf(alpha | 700, 500)
+//          + normal_lpdf(beta | 0.036, 0.05);
+//}
+
 
 //generated quantities {
 //  vector[N] log_lik;    // pointwise log-likelihood for LOO
