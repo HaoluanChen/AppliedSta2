@@ -122,104 +122,84 @@ sweden <- sweden %>% mutate(mortality = deaths/pop)
 ```
 
 ```{r}
+sweden %>%
+group_by(year) %>% summarise(avg_mort_rate = mean(mortality)) %>%
+ggplot(aes(x = year,y = avg_mort_rate)) +
+geom_line() +
+geom_point() +
+labs(title = 'average mortality rate over years')
+```
+We see that the average mortality rate is decreasing over time.
+
+```{r}
 sweden %>% filter(age>= 50 & age < 60) %>% 
   ggplot(aes(x = year, y = mortality, col = factor(age))) +   
-           geom_point()
+           geom_point() +
+            labs(title = 'average mortality rate over years for 50-59')
 
 sweden %>% filter(age>= 60 & age < 70) %>% 
   ggplot(aes(x = year, y = mortality, col = factor(age))) +   
-           geom_point()
+           geom_point()+
+            labs(title = 'average mortality rate over years for 60-69')
 
 sweden %>% filter(age>= 70 & age < 80) %>% 
   ggplot(aes(x = year, y = mortality, col = factor(age))) +   
-           geom_point()
+           geom_point()+
+            labs(title = 'average mortality rate over years for 70-79')
 
 sweden %>% filter(age>= 80 & age < 90) %>% 
   ggplot(aes(x = year, y = mortality, col = factor(age))) +   
-           geom_point()
+           geom_point()+
+            labs(title = 'average mortality rate over years for 80-89')
 sweden %>% filter(age >= 90) %>% 
   ggplot(aes(x = year, y = mortality, col = factor(age))) +   
-           geom_point()
+           geom_point()+
+            labs(title = 'average mortality rate over years for 90-100')
+```
+
+We see a overall decreasing trend for all the age group as we see for the average mortality rate. However, different age have different slope, for younger age the slope is steeper. Also notice that younger people have much lower mortality. For example in the age group 50-59, the mortality ranges from 0.002 to 0.008, where as for age group 90-100, the mortality rate ranges from 0.2 to 0.6.
+
+## b)
+
+After some trial and error, I found that both $\alpha$ and $\beta$ should be really small positive value. So let's put halfnormal(0, 0.01) on both. 
+
+```{r}
+sweden %>% mutate(age= age - mean(age)) 
+set.seed(1)
+sweden_2020 <- sweden %>% filter(year == 2020)
+prior_sample_alpha <- abs(rnorm(1000, sd = 0.01))
+prior_sample_beta <- abs(rnorm(1000, sd = 0.01))
+predicted_y1 = rep(0,1000*51)
+j = 1
+for (i in 1:1000){
+  for (index in 1:nrow(sweden_2020)){
+    predicted_y1[j] = rpois(1, lambda = prior_sample_alpha[i]*
+    exp(prior_sample_beta[i]*sweden_2020$age[index])*sweden_2020$pop[index])
+  j = j + 1
+}
+}
 ```
 
 ```{r}
-sweden %>% filter(age == 100 & year == 2020)
-sweden %>% filter(age == 50 & year == 2020)
-sweden %>% filter(age == 75 & year == 2020)
+data.frame(predicted_y1) %>%
+ggplot(aes(x = predicted_y1, y = ..density..)) +
+geom_histogram(color = 'black', fill = 'lightblue') +
+geom_vline(xintercept = 1700, color = "blue", lwd = 1.2, lty = 2) +
+labs(title = 'prior predictive distribution', x = 'death') +
+annotate("text", x = 6000, y =3e-4, label= "observed median",
+color = "blue", size = 5)+ scale_x_continuous(limits = c(0, 20000))
 ```
 
-```{r}
-# find beta and alpha that can match mortality for each 2020, age 50 and age 100. These are beta and alpha should be at the tail of our prior distribution. Since age 50 has lowest mortality and 100 has highest mortality
-x = 50
-exp(x/90)/1000
-x = 100
-exp(x/16)/1000
-```
 
-```{r}
-1/90
-1/16
 
-(1/90 + 1/16)/2
-```
-
-```{r}
-# age = 50, beta = 1, alpha = 1000
-exp(50)/1000
-```
-
-With beta \> 1, it would require really large alpha to scale it down, which means that our beta should be less than 1.
-
-```{r}
-# fix beta = 1/40 (in the middle between 1/90 and 1/16)
-beta = 40
-alpha <- seq(from = 1, to = 200, by = 2)
-x = 50
-y = exp(x/beta)/alpha
-x50 <- data.frame(alpha,y)
-x50 %>% ggplot(aes(alpha, exp(x/beta)/alpha))+ geom_point()
-x = 100
-y = exp(x/beta)/alpha
-x100 <- data.frame(alpha,y)
-x100 %>% ggplot(aes(alpha, exp(x/beta)/alpha))+ geom_point()
-```
-
-Firstly, I noticed that 0 \< $\beta$\< 1, lets put an uniform(0, 1) prior on the beta. Secondly, based on the second plot(age = 100) above, we see that when alpha is small we may see mortality rate above one, which is impossible. Therefore, the alpha is very unlikely to be below 10.
-
-```{r}
-x = 50
-exp(x/90)/1000
-```
-
-Also, it is possible to have alpha value of 1000. Therefore, I will put a normal(700, 300) prior on the alpha.
-
-```{r}
-n = 2000
-beta <- rnorm(n, 0.036, 0.03)
-alpha <- rnorm(n, 700, 300)
-
-age50 <- exp(50*beta)/alpha
-age100 <- exp(100*beta)/alpha
-q2b <- data.frame(age50,age100)
-
-q2b %>% ggplot(aes(age50)) + geom_histogram(bins = 100) +  xlim(0, 0.8) +
-  geom_vline(xintercept=0.001757909)
-
-q2b %>% ggplot(aes(age100)) + geom_histogram(bins = 100) +  xlim(0, 0.8) + 
-  geom_vline(xintercept=0.5960126)
-```
-
-```{r}
-sum(age50 < 0.001757909)
-```
 
 ## c)
 
 Prior:
 
-$$\alpha \sim N(700, 300)$$ $$\beta \sim N(0.036, 0.03)$$ Model:
+$$\alpha \sim HalfNormal(0, 0.01)$$ $$\beta \sim HalfNormal(0, 0.01)$$ Model:
 
-$$D_x \sim logPoisson(\mu_xP_x)$$ 
+$$D_x \sim Poisson(\mu_xP_x)$$ 
 
 where $\mu_x = \alpha e^{\beta x}$ 
 
@@ -229,26 +209,84 @@ $P_x$ refer to population
 
 
 ```{r}
-sweden2020 <- sweden %>% filter(year == 2020)
 
-mortality <- sweden2020$mortality
-pop <- sweden2020$pop
-age <- sweden2020$age
-
-# named list to input for stan function
-data <- list(N = length(mortality), 
-             death = sweden2020$deaths,
-             pop = pop,
-             age = age)
-
-fit3 <- stan(file = here("Assignments/Assignment2/2c_model.stan"),
-            data = data, 
-            iter = 5000, init = "random")
+stan_data <- list(N = nrow(sweden_2020),
+                  y = sweden_2020$deaths,
+                  age = sweden_2020$age - mean(sweden_2020$age),
+                  population = sweden_2020$pop)
+mod <- stan(data = stan_data,
+            file = here("Assignments/Assignment2/2c_model.stan"),
+            iter = 5000,
+            seed = 1)
 ```
 
 ```{r}
-fit3
+traceplot(mod, pars = c('alpha','beta'))
 ```
+
+The traceplot shows that four chains are mixing very well. 
+
+```{r}
+summary(mod)$summary[c("alpha", "beta"),]
+```
+The effective sample is high and Rhat very close to 1. This also shows convergence. 
+
+The posterior mean of alpha is really small 0.02662496, this is the mortality rate when the age equal to the mean age(75). The posterior mean of beta is 0.119, it means as age increase by one unit, the log mortality will increase by beta.
+
+
+## d)
+```{r}
+y <- sweden_2020$deaths
+yrep <- extract(mod)[["death_rep"]]
+samp100 <- sample(nrow(yrep), 100)
+ppc_dens_overlay(y, yrep[samp100, ]) + ggtitle("distribution of observed versus predicted death")
+```
+
+The density of the replicated is close to the observed density. 
+
+```{r}
+ppc_stat(y, yrep, stat = 'median') + ggtitle("distribution of replicated death")
+14
+```
+
+The median is right at the center of our replicated death. This indicating our model performing well. 
+
+## e) 
+
+```{r results='hide'}
+# talbe for estimate
+alphas <- c()
+betas <- c()
+years <- seq(1990, 2020, by = 1)
+for (i in 1:length(years)){
+  year_data <- sweden %>% filter(year == years[i])
+  stan_data <- list(N = nrow(year_data),
+                    y = year_data$deaths,
+                    age = year_data$age,
+                    population = year_data$pop)
+  mod_year_death <- stan(data = stan_data, 
+                         file = here("Assignments/Assignment2/2c_model.stan"),
+                         iter = 5000,seed = 1)
+  alphas <- rbind(alphas,summary(mod_year_death)$summary[c("alpha"),])
+  betas <- rbind(betas,summary(mod_year_death)$summary[c("beta"),])
+}
+```
+
+```{r}
+data.frame(alphas) %>%
+  ggplot(aes(x = years)) +
+  geom_line(aes(y = mean)) +
+  geom_ribbon(aes(ymin = X2.5., ymax = X97.5.), alpha = 0.2) +
+  labs(y = 'estimate', title = 'Estimated alpha over 1990 - 2020')
+```
+```{r}
+data.frame(betas) %>%
+  ggplot(aes(x = years)) +
+  geom_line(aes(y = mean)) +
+  geom_ribbon(aes(ymin = X2.5., ymax = X97.5.), alpha = 0.2) +
+  labs(y = 'estimate', title = 'Estimated betas over 1990 - 2020')
+```
+Based on the plot, we see that alpha is decreasing over the years. In opposite, beta is increasing This indicates that the mortality rate is lower over the year, but as age increase, the changes to mortality is increasing. 
 
 
 # 3
@@ -298,7 +336,8 @@ data <- list(N = length(d),
 
 fit1 <- stan(file = here("Assignments/Assignment2/3b1_model.stan"),
             data = data, 
-            iter = 2000)
+            iter = 2000,
+            seed = 1)
 ```
 
 

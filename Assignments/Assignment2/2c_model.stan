@@ -1,55 +1,34 @@
-/* Simple linear regression */
 data {
-  int<lower=1> N;       // number of observations
-  int <lower=0>  death[N];    // 
-  vector[N] pop;     // 
+  int<lower=0> N;                   // number of observations
+  int<lower=0> y[N];        // response (count or death)
   vector[N] age;
-
+  vector[N] population;
 }
 parameters {
-  real<lower=0> beta;           // coefs
   real<lower=0> alpha;
+  real<lower=0> beta;
 }
-
-//transformed parameters {
-//  vector[N] mu;
-//  for (i in 1:N){
-//    mu[i] = alpha * exp(beta * age[i]);
-//  }
-  
-//}
 model {
-  // Log-likelihood
-  death ~ poisson_log(log(alpha) + beta*age + log(pop));
-
-
   //priors
-  target += normal_lpdf(alpha | 700, 500)
-          + normal_lpdf(beta | 0.036, 0.05);
-          //+ normal_lpdf(beta | 0.5, 0.2);
+  alpha ~ normal(0, 0.01);
+  beta ~ normal(0,0.01);
+
+  //likelihood:
+  target += poisson_log_lpmf(y | log(alpha*exp(beta*age).*population));
+}
+generated quantities {
+  vector[N] log_lik;    // pointwise log-likelihood for LOO
+  vector[N] death_rep; // replications from posterior predictive dist
+
+  for (n in 1:N) {
+    real death_hat_n = log(alpha*exp(beta*age[n]).*population[n]);
+    log_lik[n] = poisson_log_lpmf(y[n] | death_hat_n);
+    if (death_hat_n > 20) {
+      death_rep[n] = poisson_log_rng(20);
+      }
+    else{
+      death_rep[n] = poisson_log_rng(death_hat_n);
+      }
+  }
 }
 
-
-//model {
-  // Log-likelihood
-//  for (i in 1:N){
-//      target += poisson_lpmf(death[i] | mu[i]*pop[i]);
-//  }
-
-
-  //priors
-//  target += normal_lpdf(alpha | 700, 500)
-//          + normal_lpdf(beta | 0.036, 0.05);
-//}
-
-
-//generated quantities {
-//  vector[N] log_lik;    // pointwise log-likelihood for LOO
-//  vector[N] log_weight_rep; // replications from posterior predictive dist
-
-//  for (n in 1:N) {
-//    real log_weight_hat_n = mu[n]*pop[n];
-//    log_lik[n] = poisson_log_lpmf(death[n] | log_weight_hat_n);
-//    log_weight_rep[n] =poisson_log_rng(log_weight_hat_n);
-//  }
-//}
