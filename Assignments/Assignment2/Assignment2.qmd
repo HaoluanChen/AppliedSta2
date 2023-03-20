@@ -1,7 +1,10 @@
 ---
 title: "Assignment2"
-format: html
+format: pdf
 editor: visual
+execute: 
+  warning: false
+  message: false
 ---
 
 ```{r}
@@ -66,37 +69,29 @@ MLE estimates has larger bias, variance, and MSE
 
 ## d)
 
+Sampling distribution for MLE: 
+
+Normal(112, 15)
+
+For Bayes, the sampling distribution is the the posterior distribution in a
+
 ```{r}
 mle_mu <- 113 
 mle_var <- 22.5
-x <- seq(from = 90, to = 130, by = 0.1)
+x <- seq(from = 100, to = 130, by = 0.1)
 mle_data <- dnorm(x,mle_mu, sqrt(mle_var) )
-bayes_data <- dnorm(x,mu_posterior, sqrt(sigma_posterior) )
+bayes_data <- dnorm(x,111.8182, sqrt(20.45455))
 data <- data.frame(x, mle_data, bayes_data)
 data %>%
   pivot_longer(cols = c("mle_data","bayes_data"), names_to = "type", values_to = "density") %>%
-ggplot(aes(x = x, y = density, fill = type)) +
-geom_area(alpha = 0.8) +
-labs(title = "Sampling densities by type")+
+  ggplot(aes(x = x, col = type)) +
+  geom_area(aes(y=density)) +
+  labs(title = "Sampling densities by type")+
   geom_vline(xintercept = 112, color = "black")
 ```
 
-```{r}
-n = 50 
-mle_mu <- 113 
-mle_var <- 15^2/n
-mu_posterior = (mu0/sigma0^2 + n*mu/sigma^2)/(1/sigma0^2+n/sigma^2)
-sigma_posterior = 1/(1/sigma0^2+n/sigma^2)
+The MLE in theroy is an unbiased estimator, so it should have larger variance. For bayes estimator, it is more biased towards to the prior. However, in our case, we see that for bayes estimator it has smaller bias and variance since we only have 10 data value. As we have more data values, the MLE should get close to the expected value, bias will approch to 0 and variance will decrease. 
 
-```
-
-```{r}
-n = 100 
-mle_mu <- 113 
-mle_var <- 15^2/n
-mu_posterior = (mu0/sigma0^2 + n*mu/sigma^2)/(1/sigma0^2+n/sigma^2)
-sigma_posterior = 1/(1/sigma0^2+n/sigma^2)
-```
 
 ```{r}
 n <- seq(from = 10, to = 100, by = 1)
@@ -110,6 +105,8 @@ d %>% mutate(mle_bias = mle_mu - 112, bayes_bias = mu_posterior - 112,
   ggplot(aes(x = n, y = bayes_MSE/mle_MSE)) + geom_point()
   
 ```
+
+For smaller sample size, the MSE of Bayes estimator is smaller than ML estimator, as sample size increase the difference between two estimator become smaller. 
 
 # 2
 
@@ -164,7 +161,6 @@ We see a overall decreasing trend for all the age group as we see for the averag
 After some trial and error, I found that both $\alpha$ and $\beta$ should be really small positive value. So let's put halfnormal(0, 0.01) on both. 
 
 ```{r}
-sweden %>% mutate(age= age - mean(age)) 
 set.seed(1)
 sweden_2020 <- sweden %>% filter(year == 2020)
 prior_sample_alpha <- abs(rnorm(1000, sd = 0.01))
@@ -182,12 +178,12 @@ for (i in 1:1000){
 
 ```{r}
 data.frame(predicted_y1) %>%
-ggplot(aes(x = predicted_y1, y = ..density..)) +
-geom_histogram(color = 'black', fill = 'lightblue') +
-geom_vline(xintercept = 1700, color = "blue", lwd = 1.2, lty = 2) +
-labs(title = 'prior predictive distribution', x = 'death') +
-annotate("text", x = 6000, y =3e-4, label= "observed median",
-color = "blue", size = 5)+ scale_x_continuous(limits = c(0, 20000))
+  ggplot(aes(x = predicted_y1, y = ..density..)) +
+  geom_histogram(color = 'black', fill = 'lightblue') +
+  geom_vline(xintercept = 1700, color = "blue") +
+  labs(title = 'prior predictive distribution', x = 'death') +
+  annotate("text", x = 5000, y =3e-4, label= "observed median",
+          color = "blue", size = 5)+ scale_x_continuous(limits = c(0, 20000))
 ```
 
 
@@ -197,7 +193,8 @@ color = "blue", size = 5)+ scale_x_continuous(limits = c(0, 20000))
 
 Prior:
 
-$$\alpha \sim HalfNormal(0, 0.01)$$ $$\beta \sim HalfNormal(0, 0.01)$$ Model:
+$$\alpha \sim HalfNormal(0, 0.01)$$ 
+$$\beta \sim HalfNormal(0, 0.01)$$ Model:
 
 $$D_x \sim Poisson(\mu_xP_x)$$ 
 
@@ -262,7 +259,7 @@ for (i in 1:length(years)){
   year_data <- sweden %>% filter(year == years[i])
   stan_data <- list(N = nrow(year_data),
                     y = year_data$deaths,
-                    age = year_data$age,
+                    age = year_data$age - mean(year_data$age),
                     population = year_data$pop)
   mod_year_death <- stan(data = stan_data, 
                          file = here("Assignments/Assignment2/2c_model.stan"),
@@ -289,6 +286,45 @@ data.frame(betas) %>%
 Based on the plot, we see that alpha is decreasing over the years. In opposite, beta is increasing This indicates that the mortality rate is lower over the year, but as age increase, the changes to mortality is increasing. 
 
 
+## f) 
+
+
+
+```{r}
+output_table <- data.frame()
+for (i in 1:nrow(alphas)){ # each yearh 
+  mean_mu = 0
+  lower_mu = 0
+  upper_mu = 0
+    for (age in seq(-35,25,1)){ # each age 
+    # mean
+    mean_mu = mean_mu + exp(-alphas[i,1]*exp(betas[i,1]*age))
+    # lower bound
+    lower_mu = lower_mu + exp(-alphas[i,4]*exp(betas[i,4]*age))
+    # upper bound
+    upper_mu = upper_mu + exp(-alphas[i,8]*exp(betas[i,8]*age))
+  }
+  life_exp <- c(mean_mu, lower_mu, upper_mu)
+  output_table <- rbind(output_table, life_exp)
+}
+
+colnames(output_table) <- c('mean', '2.5% lower bound', '97.5% upper bound')
+
+```
+
+```{r}
+output_table
+```
+
+```{r}
+output_table %>%
+  ggplot(aes(x = years)) +
+  geom_line(aes(y = mean)) +
+  geom_ribbon(aes(ymin = `2.5% lower bound`, ymax = `97.5% upper bound`), alpha = 0.2) +
+  labs(y = 'estimate', title = 'Estimated life expectancy over 1990 -2020')
+```
+The estimated life expectancy increased over the years from about 56 to about 57.
+
 # 3
 
 ```{r}
@@ -307,18 +343,20 @@ q3data %>% ggplot(aes(x = arsenic, y = dist , col = as.factor(switch_str))) +
   geom_smooth(method = "lm")
 ```
 
-
+Based on above plot, we see that there is more people switch as the arsenic level go up, and it looks like there is more people did not switch when the distance to the good well is larger. This is why we are seeing different slope in the plot. 
 
 
 ```{r}
 q3data %>% ggplot(aes(arsenic))+geom_histogram(bins=50)+facet_grid(.~switch_str)+
   theme_bw() 
 ```
+Based on above histogram, there are much more people did not switch when the arsenic is not that high(0 to 2.5). For the people who switched, the distribution of the arsenic level in their well was shifted more to the right. 
 
 ```{r}
 q3data %>% ggplot(aes(dist))+geom_histogram(bins=50)+facet_grid(.~switch_str)+
   theme_bw() 
 ```
+The distribution for distance for people who switch and didn't switch their well is very similar.
 
 ## b)
 
@@ -365,9 +403,23 @@ fit2 <- stan(file = here("Assignments/Assignment2/3b2_model.stan"),
 summary(fit1)$summary[c("beta[1]", "beta[2]", "beta[3]", "beta[4]"),]
 ```
 
+Interpretation:
+
+$\beta_0$: The log odds of people switch the well when they have average distance to closest safe well and average arsenic level. 
+
+$\beta_1$: The change in odds of switching as the distance increase by one unit. 
+
+$\beta_2$ The change in the log odds as the arsenic level increase by one unit. 
+
+$\beta_3$ This is an interaction, it means that the effect of increase in arsenic level on the changes in the log odds of switching by increasing distance
+
+The effect of $\beta_2$ and $\beta_3$ is not significant because its 95% credible interval contains 0. 
+
 ```{r}
 summary(fit2)$summary[c("beta[1]", "beta[2]", "beta[3]", "beta[4]"),]
 ```
+
+The effective sample size is large and Rhat are close to one for both model. 
 
 ## c)
 
@@ -376,17 +428,12 @@ summary(fit2)$summary[c("beta[1]", "beta[2]", "beta[3]", "beta[4]"),]
 q3c <- as.data.frame(sapply(q3data, function(x) gsub("\"", "", x)))
 ty_id <- q3c %>% filter(arsenic < 0.82) %>% mutate(id = as.numeric(noquote(id)))%>% pull(id)
 ty <- sum(q3data$arsenic < 0.82 & q3data$switch == 1)/sum(q3data$arsenic < 0.82)
-ty
 ```
 
 
 ```{r}
 yrep1 <- extract(fit1)[["y_rep"]] %>% t() %>% as_tibble()
 yrep2 <- extract(fit2)[["y_rep"]] %>% t() %>% as_tibble()
-```
-
-```{r}
-yrep1
 ```
 
 ```{r}
@@ -403,6 +450,19 @@ data.frame(ty_1, ty_2) %>% rename(model1 = V1, model2 = V1.1) %>%
   geom_vline(xintercept = ty, color = "red") +
   facet_wrap(.~model)
 ```
+
+
+```{r}
+mean(ty_1 < ty)
+mean(ty_2 < ty)
+```
+
+
+For model 1, there are only small portion(0.05) of simulated statistics is less than the observed test statistics. In model 2, there are 26.7% of test statistics are less than the observed test statistics. This means that  model 2 performs better since it is more close to the observed distribution.
+
+
+## d) 
+
 ```{r}
 log_lik_1 <- extract_log_lik(fit1)
 log_lik_2 <- extract_log_lik(fit2)
@@ -410,4 +470,52 @@ loo1 <- loo(log_lik_1, save_psis = TRUE)
 loo2 <- loo(log_lik_2, save_psis = TRUE)
 loo_compare(loo1, loo2)
 ```
+The second model is better because it has higher elpd. 
 
+## e)
+```{r}
+mod1_elpdi <- loo1$pointwise[,1]
+mod2_elpdi <- loo2$pointwise[,1]
+
+data.frame(mod1_elpdi, mod2_elpdi, switch = as.factor(q3data$switch)) %>%
+  ggplot(aes(x = mod1_elpdi, y = mod2_elpdi, color = switch)) +
+  geom_point() +
+  labs(x = 'elpd in model 1',
+       y = 'elpd in model 2', 
+       title = "Model 1 vs Model 2 ELPDs")
+```
+
+Based on above plot, most of the dot on the left have higher elpd in model 2, this means that the probability of observing the left one out point is higher, indicating better model. 
+
+```{r}
+diff_elpd <- mod1_elpdi - mod2_elpdi
+data.frame(diff_elpd, arsenic = q3data$arsenic, 
+           y = as.factor(q3data$switch)) %>% 
+  ggplot(aes(x = log(arsenic), y = diff_elpd, color = y)) +
+  geom_point() +
+  labs(y = 'Difference in elpd (model1 - model2)')
+```
+
+In the next plot, we see that model 1 performs better than model 2 for switch data when the log arsenic is on the low end or high end. However when the log arsenic is around the mean, model 2 outperforms model 1(difference above 0). We see an opposite trend for non-switched data that model 1 is performing better when the log arsenic is around the mean. 
+
+
+## f)
+
+$ELPD_i = log(p(y_i|y_{-i}))$
+$exp(ELPD_i) = p(y_i|y_{-i})$
+
+In our case, we have a discrete outcome of switch or not, this represents the probability mass function of the predicted probability of individual switch or not. 
+
+## g) 
+```{r}
+library(arm)
+yhat1 <- exp(mod1_elpdi)
+yhat2 <- exp(mod2_elpdi)
+y <- q3data$switch
+residual1 <- y - yhat1
+residual2 <- y - yhat2
+# model 1
+binnedplot(x = q3data$arsenic, y = residual1, xlab = 'arsenic', nclass = 40)
+binnedplot(x = log(q3data$arsenic), y = residual1, xlab = 'arsenic', nclass = 40)
+```
+The lines represents the +/- 2 SE for each bin, we see a similar number of bins outside of the SE for both model. Also, there is a slightly increasing trend of the residual in both plot, the residual is larger as the arsenic level increase. Overall, I think the residual look very similar for both model. 
