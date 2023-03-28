@@ -1,0 +1,241 @@
+---
+title: "Project EDA"
+author: "Haoluan Chen"
+format: pdf
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(readr)
+library(here)
+library(skimr)
+library(lubridate)
+```
+
+```{r}
+fire <- read_csv(here("Project/fire.csv"))
+View(fire)
+```
+
+We are interested in the cost of the fire, when the final incident type is 03 - NO LOSS OUTDORR fire, there is no cost associate with it. Therefore we remove these obervations in our data. 
+
+```{r}
+fire <- fire %>% 
+  filter(Final_Incident_Type != "03 - NO LOSS OUTDOOR fire (exc: Sus.arson,vandal,child playing,recycling or dump fires)" ) %>% 
+  mutate(Final_Incident_Type = if_else(Final_Incident_Type == "02 - Explosion (including during Fire, excluding Codes 3 & 11-13)", "02 - Explosion", Final_Incident_Type))
+```
+
+
+There are 216 observations with missing Estimated_Dollar_Loss. These observations also does not have values for other important variables. As in the Toronto Open Data: Incidents with incomplete data may be under investigation or is classified as a no loss outdoor fire. Therefore, I decided to remove these observations.
+
+
+```{r}
+fire <- fire %>% filter(!is.na(Estimated_Dollar_Loss))
+```
+
+
+
+
+For outdoor fire, such as fire started from Vehicle, there is no any fire prevention system in place, which is not really our research interest. I chose to remove these observations 
+
+```{r}
+fire <- fire %>% filter(!is.na(Smoke_Alarm_at_Fire_Origin))
+```
+
+
+Select the variables that we are interested in: 
+
+```{r}
+cleaned <- fire %>% select(Estimated_Dollar_Loss,  Extent_Of_Fire, Incident_Station_Area, 
+                Material_First_Ignited, Ignition_Source,  # Fire characteristics
+                Fire_Alarm_System_Operation, Smoke_Alarm_at_Fire_Origin, 
+                Sprinkler_System_Operation, # fire prevention system 
+                Fire_Under_Control_Time, # TFS related
+                Number_of_responding_personnel, 
+                TFS_Alarm_Time, TFS_Arrival_Time, Fire_Under_Control_Time) %>% 
+  mutate(Fire_Alarm_System_Operation = 
+           case_when(Fire_Alarm_System_Operation == "1 - Fire alarm system operated" ~ "Operated",
+                     Fire_Alarm_System_Operation == "2 - Fire alarm system did not operate" ~ "Didn't operate",
+                     Fire_Alarm_System_Operation == "8 - Not applicable (no system)" ~ "No system",
+                     Fire_Alarm_System_Operation == "9 - Fire alarm system operation undetermined" ~ "Undetermined "),
+         Sprinkler_System_Operation = case_when(
+           Sprinkler_System_Operation == "1 - Sprinkler system activated" ~ "Operated", 
+                                                
+           Sprinkler_System_Operation == "2 - Did not activate: remote from fire" ~ "Didn't operate",
+                                                
+           Sprinkler_System_Operation == "3 - Did not activate: fire too small to trigger system" ~ "Didn't operate",
+                                                
+           Sprinkler_System_Operation == "4 - Other reason for non activation/operation" ~ "Didn't operate",
+                                                
+           Sprinkler_System_Operation == "5 - Did not activate: reason unknown" ~ "Didn't operate",
+                                                
+           Sprinkler_System_Operation == "8 - Not applicable - no sprinkler system present" ~ "No system",
+                                                
+           Sprinkler_System_Operation == "9 - Activation/operation undetermined" ~ "Undetermined"),
+         Smoke_Alarm_at_Fire_Origin = case_when(
+           Smoke_Alarm_at_Fire_Origin == "1 - Floor/suite of fire origin: No smoke alarm" ~ "No system",
+           Smoke_Alarm_at_Fire_Origin == "2 - Floor/suite of fire origin: Smoke alarm present and operated" ~ "Operated",
+           Smoke_Alarm_at_Fire_Origin == "3 - Floor/suite of fire origin: Smoke alarm present did not operate" ~ "Didn't operate",
+           Smoke_Alarm_at_Fire_Origin == "4 - Floor/suite of fire origin: Smoke alarm present, operation undetermined" ~ "Undetermined",
+           Smoke_Alarm_at_Fire_Origin == "9 - Floor/suite of fire origin: Smoke alarm presence undetermined" ~ "Undetermined"),
+         Time_Took_Arrival = TFS_Arrival_Time - TFS_Alarm_Time,
+         Time_to_put_down_fire = Fire_Under_Control_Time - TFS_Arrival_Time) %>% 
+         filter(Estimated_Dollar_Loss<=5000000) %>% 
+         filter(Estimated_Dollar_Loss != 0) %>% 
+         filter(Time_to_put_down_fire != 0) %>% 
+         filter(Time_Took_Arrival != 0)
+
+```
+
+```{r}
+skim(cleaned)
+```
+
+
+
+Research Question of interest:
+
+Understanding the relationship between the estimated dollar loss for indoor fire based on fires characteristics, presence of fire prevention systems(smoke alarm and Sprinkler system), time for the Toronto Fire Services to arrive and control the fire. 
+
+```{r}
+table(cleaned$Fire_Alarm_System_Operation)
+```
+```{r}
+table(cleaned$Sprinkler_System_Operation)
+```
+
+```{r}
+table(cleaned$Smoke_Alarm_at_Fire_Origin)
+```
+```{r}
+table(cleaned$Extent_Of_Fire)
+```
+
+```{r}
+summary(cleaned)
+```
+```{r}
+# removing 12 outlier with cost of 5M+
+cleaned <- cleaned %>% filter(Estimated_Dollar_Loss<=5000000)
+```
+
+
+```{r}
+cleaned %>% filter(Number_of_responding_personnel < 1000) %>%  
+  ggplot(aes(x = Number_of_responding_personnel , y = log(Estimated_Dollar_Loss))) + 
+  geom_point() +
+  geom_smooth()
+```
+
+```{r}
+cleaned %>% filter(Number_of_responding_personnel < 1000) %>%  
+  ggplot(aes(x = Time_to_put_down_fire , y = Estimated_Dollar_Loss)) + 
+  geom_point() +
+  geom_smooth()
+```
+
+
+```{r}
+cleaned %>% ggplot(aes(x=log(Estimated_Dollar_Loss))) + geom_histogram(bins = 30)
+```
+
+```{r}
+cleaned %>% ggplot(aes(x = log(as.numeric(Time_Took_Arrival)))) + geom_histogram()
+```
+
+```{r}
+cleaned %>% ggplot(aes(x = log(as.numeric(Time_to_put_down_fire)))) + geom_histogram(bins= 40)
+```
+
+
+```{r}
+cleaned %>% filter(log(as.numeric(Time_to_put_down_fire)) != 0) %>% 
+  ggplot(aes(x = log(as.numeric(Time_to_put_down_fire)), y = log(Estimated_Dollar_Loss),
+             col = Fire_Alarm_System_Operation)) + 
+    geom_smooth(method='lm') + 
+  geom_point(alpha = 0.4) +  facet_wrap(~ Fire_Alarm_System_Operation)
+```
+
+
+```{r}
+cleaned %>% ggplot(aes(y = log(Estimated_Dollar_Loss), x = Fire_Alarm_System_Operation)) + 
+  geom_boxplot()
+```
+
+```{r}
+cleaned %>% filter(Time_to_put_down_fire != 0) %>% 
+  ggplot(aes(x = log(as.numeric(Time_to_put_down_fire)), y = log(Estimated_Dollar_Loss),col = Sprinkler_System_Operation)) +
+  geom_smooth(method='lm') + 
+  geom_point(alpha = 0.4) + facet_wrap(~ Sprinkler_System_Operation)
+```
+
+```{r fig.width=10}
+cleaned %>% filter(Time_to_put_down_fire != 0) %>% 
+  ggplot(aes(x = log(as.numeric(Time_to_put_down_fire)), y = log(Estimated_Dollar_Loss),col = Extent_Of_Fire)) +
+  geom_smooth(method='lm') + 
+  geom_point(alpha = 0.4) + facet_wrap(~ Extent_Of_Fire)
+```
+
+```{r}
+cleaned %>% ggplot(aes(y = log(Estimated_Dollar_Loss), x= Sprinkler_System_Operation)) + 
+  geom_boxplot()
+```
+
+```{r}
+cleaned %>% filter(Time_to_put_down_fire != 0) %>% 
+  ggplot(aes(x = log(as.numeric(Time_to_put_down_fire)), y = log(Estimated_Dollar_Loss), col = Smoke_Alarm_at_Fire_Origin)) + 
+  geom_point(alpha = 0.4) + facet_wrap(~ Smoke_Alarm_at_Fire_Origin)
+```
+
+```{r}
+cleaned %>% ggplot(aes(y = log(Estimated_Dollar_Loss), x =Smoke_Alarm_at_Fire_Origin)) + 
+  geom_boxplot()
+```
+
+```{r}
+cleaned %>% ggplot(aes(x = Extent_Of_Fire))+ geom_histogram(stat="count")  + coord_flip()
+```
+
+```{r}
+cleaned %>% ggplot(aes(x = Extent_Of_Fire, y = log(Estimated_Dollar_Loss)))+ geom_boxplot()  + coord_flip()
+```
+
+Material_First_Ignited 
+```{r}
+table(cleaned$Material_First_Ignited)
+```
+
+```{r fig.height= 6}
+cleaned %>% ggplot(aes(x = Material_First_Ignited, y = log(Estimated_Dollar_Loss)))+ geom_boxplot()  + coord_flip()
+```
+```{r fig.height=10, fig.width=8}
+cleaned %>% ggplot(aes(x = Ignition_Source, y = log(Estimated_Dollar_Loss)))+ geom_boxplot()  + coord_flip()
+```
+
+```{r}
+cleaned %>% filter(Time_Took_Arrival !=0)  %>% 
+  ggplot(aes(x = Time_Took_Arrival, y = log(Estimated_Dollar_Loss))) + 
+  geom_point(alpha = 0.4)
+```
+```{r fig.height=10}
+cleaned %>% filter(Time_Took_Arrival !=0)  %>% 
+  ggplot(aes(x = as.factor(Incident_Station_Area), y = log(as.numeric(Time_Took_Arrival)))) +
+  geom_boxplot() + 
+  coord_flip()
+```
+```{r fig.height=12}
+cleaned %>% filter(Time_Took_Arrival !=0)  %>% 
+  ggplot(aes(x = as.factor(Incident_Station_Area), y = log(Estimated_Dollar_Loss))) +
+  geom_boxplot() + 
+  coord_flip()
+```
+
+```{r fig.height=12}
+cleaned %>% filter(Time_Took_Arrival !=0)  %>% 
+  ggplot(aes(x = as.factor(Incident_Station_Area), y = log(as.numeric(Time_to_put_down_fire)))) +
+  geom_boxplot() + 
+  coord_flip()
+```
+
