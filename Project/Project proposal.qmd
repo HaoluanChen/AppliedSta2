@@ -1,0 +1,150 @@
+---
+title: "Research Proposal"
+format: pdf
+editor: visual
+author: "Haoluan Chen"
+execute: 
+  warning: false
+  message: false
+---
+
+```{r echo=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(readr)
+library(here)
+library(skimr)
+library(patchwork)
+```
+
+```{r echo=FALSE}
+fire <- read_csv(here("Project/fire.csv"))
+fire <- fire %>% 
+  filter(Final_Incident_Type != "03 - NO LOSS OUTDOOR fire (exc: Sus.arson,vandal,child playing,recycling or dump fires)" ) %>% 
+  mutate(Final_Incident_Type = if_else(Final_Incident_Type == "02 - Explosion (including during Fire, excluding Codes 3 & 11-13)", "02 - Explosion", Final_Incident_Type))
+fire <- fire %>% filter(!is.na(Estimated_Dollar_Loss))
+cleaned <- fire %>% select(Estimated_Dollar_Loss,  Extent_Of_Fire, Incident_Station_Area, 
+                Material_First_Ignited, Ignition_Source,  # Fire characteristics
+                Fire_Alarm_System_Operation, Smoke_Alarm_at_Fire_Origin, 
+                Sprinkler_System_Operation, # fire prevention system 
+                Fire_Under_Control_Time, # TFS related
+                Number_of_responding_personnel, 
+                TFS_Alarm_Time, TFS_Arrival_Time, Fire_Under_Control_Time) %>% 
+  mutate(Fire_Alarm_System_Operation = 
+           case_when(Fire_Alarm_System_Operation == "1 - Fire alarm system operated" ~ "Operated",
+                     Fire_Alarm_System_Operation == "2 - Fire alarm system did not operate" ~ "Didn't operate",
+                     Fire_Alarm_System_Operation == "8 - Not applicable (no system)" ~ "No system",
+                     Fire_Alarm_System_Operation == "9 - Fire alarm system operation undetermined" ~ "Undetermined "),
+         Sprinkler_System_Operation = case_when(
+           Sprinkler_System_Operation == "1 - Sprinkler system activated" ~ "Operated", 
+                                                
+           Sprinkler_System_Operation == "2 - Did not activate: remote from fire" ~ "Didn't operate",
+                                                
+           Sprinkler_System_Operation == "3 - Did not activate: fire too small to trigger system" ~ "Didn't operate",
+                                                
+           Sprinkler_System_Operation == "4 - Other reason for non activation/operation" ~ "Didn't operate",
+                                                
+           Sprinkler_System_Operation == "5 - Did not activate: reason unknown" ~ "Didn't operate",
+                                                
+           Sprinkler_System_Operation == "8 - Not applicable - no sprinkler system present" ~ "No system",
+                                                
+           Sprinkler_System_Operation == "9 - Activation/operation undetermined" ~ "Undetermined"),
+         Smoke_Alarm_at_Fire_Origin = case_when(
+           Smoke_Alarm_at_Fire_Origin == "1 - Floor/suite of fire origin: No smoke alarm" ~ "No system",
+           Smoke_Alarm_at_Fire_Origin == "2 - Floor/suite of fire origin: Smoke alarm present and operated" ~ "Operated",
+           Smoke_Alarm_at_Fire_Origin == "3 - Floor/suite of fire origin: Smoke alarm present did not operate" ~ "Didn't operate",
+           Smoke_Alarm_at_Fire_Origin == "4 - Floor/suite of fire origin: Smoke alarm present, operation undetermined" ~ "Undetermined",
+           Smoke_Alarm_at_Fire_Origin == "9 - Floor/suite of fire origin: Smoke alarm presence undetermined" ~ "Undetermined"),
+         Time_Took_Arrival = TFS_Arrival_Time - TFS_Alarm_Time,
+         Time_to_put_down_fire = Fire_Under_Control_Time - TFS_Arrival_Time) %>% 
+         filter(Estimated_Dollar_Loss<=5000000) %>% 
+         filter(Estimated_Dollar_Loss != 0) %>% 
+         filter(Time_to_put_down_fire != 0) %>% 
+         filter(Time_Took_Arrival != 0) %>% 
+         filter(!is.na(Extent_Of_Fire))
+```
+
+# Research questions of interest
+
+As our population grow, the larger number of people live and work in bigger buildings all round the world. However, the risk and the cost of indoor fire is also increasing. For my project, I am interested in understanding the relationship between the estimated dollar loss for indoor fire based on fires characteristics, presence of fire prevention systems, time for the Toronto Fire Services to arrive and control the fire.
+
+# Main independent variables of interest
+
+My main dependent variable of interest is the estimated cost of indoor fire.
+
+# Dependent variable of interest
+
+My dependent variable can be group into three main category: fire characteristics, presence of fire prevention systems and the time for the Toronto Fire Services to arrive and control the fire.
+
+Fire characteristics includes following variables: Extent of fire, material first ignited.
+
+Presence of fire prevention system includes: presence of fire alarm, smoke alarm, and sprinkler system.
+
+Lastly, included the alarm time for Toronto Fire Service(TFS), time for TFS to arrive and the time when fire is under control. With these variables, we are able to derive the time took for TFS to arrive after the alarm, and the time took for TFS to control the fire.
+
+# Dataset
+
+The dataset is available in Toronto Open (Data.https://open.toronto.ca/dataset/fire-incidents/). The dataset include only fire incidents as defined by the Ontario fire Marshal(OFM) up to Decemeber 31, 2021.
+
+The original dataset contains 25,860 observations and 43 variables. However, it includes any observations related to outdoor fire which are not our focus. All the outdoor fire are remove from the data. There are 216 observations with missing Estimated_Dollar_Loss are also removed because it is our variable of interest.
+
+After data cleaning process described above, there are still 4855 observations with missing values for the following variables: Extent_Of_Fire, Fire_Alarm_System_Operation, Smoke_Alarm_at_Fire_Origin, Sprinkler_System_Operation. As in the Toronto Open Data: Incidents with incomplete data may be under investigation or is classified as a no loss outdoor fire. Therefore, I decided to remove these observations. Lastly, I remove 12 outlier with estimated cost above 5 Million for better plots.
+
+# EDA
+
+```{r echo=FALSE}
+cleaned %>% ggplot(aes(x=log(Estimated_Dollar_Loss))) + 
+  geom_histogram(bins = 20) +
+  labs(title = "Histogram of the log(estimated dollar loss) of indoor fire") + 
+  theme_bw()
+
+```
+
+The log estimated dollar loss is close to nromal.
+
+```{r echo=FALSE, fig.width=10, fig.height=7 }
+fire_alarm_box <- cleaned %>% ggplot(aes(y = log(Estimated_Dollar_Loss), x = Fire_Alarm_System_Operation)) + 
+  geom_boxplot() + 
+  theme_bw() 
+sprinkler_box <-cleaned %>% ggplot(aes(y = log(Estimated_Dollar_Loss), x= Sprinkler_System_Operation)) + 
+  geom_boxplot()+ 
+  theme_bw()
+smoke_alarm_box <- cleaned %>% ggplot(aes(y = log(Estimated_Dollar_Loss), x= Smoke_Alarm_at_Fire_Origin)) + 
+  geom_boxplot()+ 
+  theme_bw()
+
+fire_alarm_box + sprinkler_box + smoke_alarm_box + plot_annotation(
+  title = "Boxplot of log(Estimated_Dollar_Loss) vs the presence of the fire prevention system",
+)
+```
+
+Looks like if the fire prevention system did not operated, the cost is lower. This is likely that because fire is too small to trigger the system. For fire alarm, the median of log cost when there is no system is slightly higher than when the system operated. Where as for sprinkler system when system operated has higher cost compared to no system. No significant difference for smoke alarm between no system and operated. Also notice that when the median when system operated has higher cost compared to when the system did not operate for all three system.
+
+```{r echo=FALSE,fig.width=10, fig.height=8}
+cleaned %>% filter(Time_to_put_down_fire != 0) %>% 
+  ggplot(aes(x = log(as.numeric(Time_to_put_down_fire)), y = log(Estimated_Dollar_Loss),col = Extent_Of_Fire)) +
+  geom_smooth(method='lm') + 
+  geom_point(alpha = 0.4) + facet_wrap(~ Extent_Of_Fire)
+```
+
+Different extent of fire lead to different slope when we have the log cost on the y axis and the time to put down the fire on x axis. Maybe we can put an interaction on the extent of fire and the time took to put down fire.
+
+```{r echo=FALSE, fig.height= 6}
+cleaned %>% ggplot(aes(x = Material_First_Ignited, y = log(Estimated_Dollar_Loss)))+ geom_boxplot()  + coord_flip()
+```
+
+Different material first ignited has different cost distribution, suggesting an random effect.
+
+# Model
+
+Based on my EDA, I'm going to fit the following model:
+
+$$y_{[i]} |\alpha_{j[i]}, \beta_{[i]} \sim N(\alpha_{j[i]}+ \beta_{[i]}x_i)$$
+
+With normal noninformative on the $\alpha_{j[i]}$ and $\beta$
+
+Where $\alpha_{j[i]}$ is the Material First Ignited specific intercept (Random effect)
+
+$\beta$ are the coefficients of the fixed effect including variables listed in Dependent variable of interest and an interaction between extent of fire and the time took to put down fire.
+
+$x_i$ is the dependent variable
